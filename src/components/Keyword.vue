@@ -34,40 +34,117 @@
     </button>
       
 
-    <ul class="px-3 list-disc">
+    <!-- <ul class="px-3 list-disc">
       <li v-for="people in peoples" :key="people.url">
         {{ people.name }} - Height: {{ people.height }} Mass: {{ people.mass }}
       </li>
+    </ul> -->
+
+    <ul class="px-3 list-disc">
+      <li v-for="item in peoples" :key="item.id">
+        {{ item[0] }}
+      </li>
     </ul>
+
+    
+
   </div>
 </template>
 
 <script>
 import axios from "axios";
 import { debounce } from "lodash";
+import products from './data.json'
+
+
 export default {
   data: () => ({
     keyword: "",
-    peoples: []
+    peoples: [],
+    items: products
   }),
 
   methods: {
+    cosine(A, B){
+      var dotproduct=0;
+      var mA=0;
+      var mB=0;
+      for(var i = 0; i < A.length; i++){ // here you missed the i++
+          dotproduct += (A[i] * B[i]);
+          mA += (A[i]*A[i]);
+          mB += (B[i]*B[i]);
+      }
+      mA = Math.sqrt(mA);
+      mB = Math.sqrt(mB);
+      var similarity = (dotproduct)/((mA)*(mB)) // here you needed extra brackets
+      return similarity;
+
+    },
     checkName() {
       console.log(`Checking name: ${this.keyword}`);
-      axios
-        .get("https://swapi.dev/api/people/", {
-          params: {
-            search: this.keyword
-          }
-        })
-        .then(res => {
-          // console.log(res.data.results);
-          this.peoples = res.data.results;
-        })
-        .catch(err => {
-          console.log(err);
-        });
-    }
+
+        axios({
+            method: 'post',
+            headers: {'content-type': 'application/json'},
+            url: 'http://127.0.0.1:8125/encode',
+            data: { "id": 123,"texts": [this.keyword], "is_tokenized": false}
+          })
+          .then((response) => {
+            
+              console.log('Response status', response);
+              if (response.data.status == 200){
+                // console.log('result', response.data.result[0]);
+                let query_vec = response.data.result[0]
+
+                var result = []
+
+                if (this.keyword.length > 5){
+
+                  var keys = Object.keys(this.items[0]);
+                  var values =  Object.values(this.items[0])
+
+                  for(var i = 0; i < keys.length; i++){
+                    console.log("key", keys[i]);
+                    var similarity = this.cosine(values[i], query_vec);
+                    if (similarity > 0.4){
+                      result.push([keys[i], this.cosine(values[i], query_vec)])
+                    }
+                  }
+
+                  result.sort(function(a,b) {
+                      return b[1]-a[1]
+                  });
+
+                  // console.log("Result", result.slice(0,3));
+                  this.peoples = result.slice(0,4);
+
+              }
+            }
+          })
+          .catch(err => {
+            console.log(err);
+          });
+
+      }
+
+        // axios
+        // .get("https://swapi.dev/api/people/", {
+        //   params: {
+        //     search: this.keyword
+        //   }
+        // })
+        // .then(res => {
+        //   // console.log(res.data.results);
+        //   this.peoples = res.data.results;
+        // })
+        // .catch(err => {
+        //   console.log(err);
+        // });
+
+      // }
+
+      
+
   },
   created() {
     this.debounceName = debounce(this.checkName, 1000);
